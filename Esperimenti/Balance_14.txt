@@ -1,0 +1,104 @@
+ea.experiment(
+	runs = (randomGenerator = (seed = [14]) * [ea.rg.defaultRG()]) *
+		(solver = (
+			mapper = [
+				er.m.numericalParametrizedHomoBrains(
+					target = s.a.centralizedNumGridVSR(
+						body = s.a.vsr.gridBody(
+							sensorizingFunction = s.a.vsr.sf.directional(
+								headSensors = [s.s.sin(f = 0);s.s.d(a = -15; r = 5)];
+								nSensors = [s.s.ar(); s.s.rv(a = 0); s.s.rv(a = 90)];
+								sSensors = [s.s.d(a = -90)]
+							);
+							shape = s.a.vsr.s.free(s = "001100-001100-001100-001100-111111")
+						);
+						function = ds.num.stepped(stepT = 0.2; inner = ds.num.noised(inputSigma = 0.05; inner = ds.num.mlp()))
+					)
+				);
+				er.m.numericalParametrizedHomoBrains(
+					target = s.a.distributedNumGridVSR(
+						body = s.a.vsr.gridBody(
+							sensorizingFunction = s.a.vsr.sf.uniform(
+								sensors = [s.s.ar(); s.s.rv(a = 0); s.s.rv(a = 90)]
+							);
+							shape = s.a.vsr.s.free(s = "001100-001100-001100-001100-111111")
+						);
+						function = ds.num.stepped(stepT = 0.2; inner = ds.num.noised(inputSigma = 0.05; inner = ds.num.mlp()));
+						signals = 1
+					)
+				);
+				er.m.numericalParametrizedHeteroBrains(
+					target = s.a.distributedNumGridVSR(
+						body = s.a.vsr.gridBody(
+							sensorizingFunction = s.a.vsr.sf.directional(
+								headSensors = [s.s.sin(f = 0);s.s.d(a = -15; r = 5)];
+								nSensors = [s.s.ar(); s.s.rv(a = 0); s.s.rv(a = 90)];
+								sSensors = [s.s.d(a = -90)]
+							);
+							shape = s.a.vsr.s.free(s = "001100-001100-001100-001100-111111")
+						);
+						function = ds.num.stepped(stepT = 0.2; inner = ds.num.noised(inputSigma = 0.05; inner = ds.num.mlp()));
+						signals = 1
+					) 
+				)
+			]) * [
+				ea.s.cmaEs(mapper = ea.m.identity(); nEval = 10000);
+	  
+				ea.s.differentialEvolution(mapper = ea.m.identity(); nEval = 10000);	
+			  
+				ea.s.doubleStringGa(mapper = ea.m.identity(); sigmaMut = 0.02; nEval = 10000);
+				ea.s.doubleStringGa(mapper = ea.m.identity(); sigmaMut = 0.25; nEval = 10000);
+				ea.s.doubleStringGa(mapper = ea.m.identity(); sigmaMut = 0.5; nEval = 10000);
+			  
+				ea.s.simpleEs(mapper = ea.m.identity(); sigma = 0.02; nEval = 10000);
+				ea.s.simpleEs(mapper = ea.m.identity(); sigma = 0.25; nEval = 10000);
+				ea.s.simpleEs(mapper = ea.m.identity(); sigma = 0.5; nEval = 10000);
+				
+				ea.s.openAiEs(mapper = ea.m.identity(); sigma = 0.02; nEval = 10000);
+				ea.s.openAiEs(mapper = ea.m.identity(); sigma = 0.25; nEval = 10000);
+				ea.s.openAiEs(mapper = ea.m.identity(); sigma = 0.5; nEval = 10000);
+			  
+				ea.s.pso(mapper = ea.m.identity(); nEval = 10000)
+			]
+		) * [
+			ea.run(
+				problem = ea.p.totalOrder(
+					qFunction = s.taskRunner(task = s.task.balancing(swingLength = 30; duration = 30));
+					cFunction = s.task.b.avgSwingAngleWithMalus();
+					type = minimize
+				)
+			)
+		];
+	listeners = [
+		er.l.videoSaver(videos = [
+			er.video(
+				task = s.task.balancing(swingLength = 30; duration = 30);
+				w = 600;
+				h = 450;
+				drawer = s.drawer(enlargement = 4.5);
+				filePathTemplate = "video-{solver:%#s}-{solver.sigma}-{solver.sigmaMut}--{solver.mapper:%#s}-{solver.mapper.target:%#s}--{problem.qFunction.task:%#s}--{randomGenerator.seed:%02d}.mp4";
+				titleTemplate = "{solver:%#s}-{solver.sigma}-{solver.sigmaMut}--{solver.mapper:%#s}-{solver.mapper.target:%#s}--{problem.qFunction.task:%#s}--{randomGenerator.seed:%02d}"
+			)
+		]);
+		ea.l.bestCsv(
+			filePath = "balance_best_14.csv";
+			functions = [
+				ea.nf.bestFitness(f = ea.nf.f(outerF = s.task.b.avgSwingAngleWithMalus(); s = "%5.2f"));
+				ea.nf.size(f = ea.nf.genotype(individual = ea.nf.best()); s = "%5d");
+				er.nf.w(f = er.nf.gridBody(f = ea.nf.solution(individual = ea.nf.best())));
+				er.nf.h(f = er.nf.gridBody(f = ea.nf.solution(individual = ea.nf.best())));
+				ea.nf.percentile(collection = ea.nf.each(map = ea.nf.f(innerF = ea.nf.fitness(); outerF = s.task.b.avgSwingAngleWithMalus()); collection = ea.nf.all()); p = 0.25; s = "%6.4f");
+				ea.nf.percentile(collection = ea.nf.each(map = ea.nf.f(innerF = ea.nf.fitness(); outerF = s.task.b.avgSwingAngleWithMalus()); collection = ea.nf.all()); p = 0.50; s = "%6.4f");
+				ea.nf.percentile(collection = ea.nf.each(map = ea.nf.f(innerF = ea.nf.fitness(); outerF = s.task.b.avgSwingAngleWithMalus()); collection = ea.nf.all()); p = 0.75; s = "%6.4f")
+			];
+			runKeys = [
+				ea.misc.sEntry(key = "seed"; value = "{randomGenerator.seed}");
+				ea.misc.sEntry(key = "problem"; value = "{problem:%#s}-{problem.p}-{problem.target}");
+				ea.misc.sEntry(key = "solver"; value = "{solver:%#s}");
+				ea.misc.sEntry(key = "sigma"; value = "{solver.sigma}-{solver.sigmaMut}");
+				ea.misc.sEntry(key = "task"; value = "{problem.qFunction.task:%#s}");
+				ea.misc.sEntry(key = "mapper_target"; value = "{solver.mapper:%#s}-{solver.mapper.target:%#s}")
+			]
+		)
+	]
+)
